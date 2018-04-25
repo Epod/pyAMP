@@ -9,11 +9,13 @@ Additionally, in certain instances, the AMP Web Interface can sometimes be unres
 ## Getting Started
 ### Quick Start
 - Generate API Key From [https://console.amp.cisco.com/api_credentials](https://console.amp.cisco.com/api_credentials)
+- (Optional) Write API credentials to `config.ini`
 - Execute `python setup.py install`
 - Launch `python pyamp.py`
 ### API Key
 A read only API key is required. API keys for Cisco AMP can be found at [https://console.amp.cisco.com/api_credentials](https://console.amp.cisco.com/api_credentials). This URL might be different depending on your region (ie. APJC & EU). 
 
+You may write these keys to the `config.ini` file if you do not wish to enter in the credentials every time the script is launched
 ### First Run/Dependencies
 
 pyAMP leverages some dependencies in order to run. To ensure all dependencies are present, first launch the **setup.py** file included in the repository. 

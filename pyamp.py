@@ -1,5 +1,6 @@
 import base64
 import csv
+import configparser
 
 try:
     import menu3
@@ -61,6 +62,8 @@ def getEvents(authstring, region, event_type, offset):
 
 # Start Script
 print("AMP Tool Box")
+config = configparser.ConfigParser()
+config.read('config.ini')
 
 rootMenu = menu3.Menu(True)
 rootMenuOptions = ["Export CSVs"]
@@ -84,12 +87,12 @@ if rootMenuOptions[rootSelection-1] == "Export CSVs":
     if regionMenuOptions[regionMenuSelection - 1] == "EU":
         regionURL = "api.eu.amp.cisco.com"
 
-    creds = {'3rd Party API Client ID': "000000000000000000000", 'API Key': "00000000-0000-0000-0000-000000000000"}
+    creds = {'3rd Party API Client ID': config['DEFAULT']['CLIENT_ID'], 'API Key': config['DEFAULT']['API_KEY']}
     creds = exportMenu.config_menu("Enter AMP API Credentials", creds,
                                    "Select which field to edit, or Return to proceed: ")
 
     # Confirm Login Details Are Correct
-    auth = str(stringToBase64(creds['3rd Party API Client ID'] + ":" + creds['API Key']), 'utf-8')
+    auth = str(stringToBase64(str(creds['3rd Party API Client ID']) + ":" + str(creds['API Key'])), 'utf-8')
     response = requests.get("https://" + regionURL + "/v1/version", headers={'Authorization': 'Basic ' + auth})
     data = response.json()
 
