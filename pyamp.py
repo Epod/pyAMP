@@ -14,13 +14,6 @@ except ImportError:
     print("Missing module: requests\nConsider running \"setup.py install\"")
     exit(2)
 
-print("AMP Tool Box")
-
-rootMenu = menu3.Menu(True)
-rootMenuOptions = ["Export CSVs"]
-rootSelection = rootMenu.menu("Please make a selection", rootMenuOptions, "Your choice, 'q' to quit:")
-rootMenu.success("You selected: " + rootMenuOptions[rootSelection-1])
-
 
 def stringToBase64(s):
     return base64.b64encode(s.encode('utf-8'))
@@ -66,6 +59,13 @@ def getEvents(authstring, region, event_type, offset):
                                  headers={'Authorization': 'Basic ' + authstring})
     return responseTypes.json()
 
+# Start Script
+print("AMP Tool Box")
+
+rootMenu = menu3.Menu(True)
+rootMenuOptions = ["Export CSVs"]
+rootSelection = rootMenu.menu("Please make a selection", rootMenuOptions, "Your choice, 'q' to quit:")
+rootMenu.success("You selected: " + rootMenuOptions[rootSelection-1])
 
 # Export CSVs
 # Step 1: Select The AMP Region Where The API Keys Are Located
@@ -134,10 +134,9 @@ if rootMenuOptions[rootSelection-1] == "Export CSVs":
             data["data"].append(i)
         currentCycle += 1
 
-
+    # Export JSON to CSV
     node = "data"
     csv_file_path = "output.csv"
-
     raw_data = data
 
     try:
@@ -150,9 +149,7 @@ if rootMenuOptions[rootSelection-1] == "Export CSVs":
     for item in data_to_be_processed:
         reduced_item = {}
         reduce_item(node, item)
-
         header += reduced_item.keys()
-
         processed_data.append(reduced_item)
 
     header = list(set(header))
