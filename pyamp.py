@@ -6,6 +6,7 @@ if (sys.version_info < (3, 0)):
 
 import base64
 import csv
+import os
 import configparser
 
 try:
@@ -66,9 +67,44 @@ def getEvents(authstring, region, event_type, offset):
                                  headers={'Authorization': 'Basic ' + authstring})
     return responseTypes.json()
 
+class bcolors:
+    HEADER = '\033[95m'
+    OKBLUE = '\033[94m'
+    OKGREEN = '\033[92m'
+    WARNING = '\033[93m'
+    FAIL = '\033[91m'
+    ENDC = '\033[0m'
+    BOLD = '\033[1m'
+    UNDERLINE = '\033[4m'
+
+
 # Start Script
 print("AMP Tool Box")
 config = configparser.ConfigParser()
+# Check if config.ini file exists. If not, download new one or error
+try:
+    file = open('config.ini', 'r')
+    file.close()
+except IOError:
+    try:
+        print(bcolors.WARNING + "WARNING: config.ini file missing. Attempting to download a default copy... \n"
+              + bcolors.ENDC)
+        configfile = requests.get('https://raw.githubusercontent.com/Epod/pyAMP/master/config.ini')
+        if configfile.status_code == 200:
+            file = open('config.ini', 'w')
+            file.write(configfile.text)
+            file.close()
+            print(bcolors.OKBLUE + "SUCCESS: The config.ini file was missing. "
+                                   "Successfully re-downloaded with default values.\n "
+                                   "Consider updating this file." + bcolors.ENDC)
+        else:
+            print("ERROR: The config.ini file is missing. Attempted to download a copy, but failed.\n")
+            exit()
+    except:
+        print(bcolors.WARNING + "ERROR: config.ini file missing. Failed to automatically resolve... \n"
+              + bcolors.ENDC)
+        exit()
+
 config.read('config.ini')
 
 rootMenu = menu3.Menu(True)
