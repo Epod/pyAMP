@@ -43,35 +43,57 @@ def to_string(s):
 
 def reduce_item(key, value):
     global reduced_item
-
     # Reduction Condition 1
     if type(value) is list:
         i = 0
         for sub_item in value:
             reduce_item(key + '_' + to_string(i), sub_item)
             i = i + 1
-
     # Reduction Condition 2
     elif type(value) is dict:
         sub_keys = value.keys()
         for sub_key in sub_keys:
             reduce_item(key + '_' + to_string(sub_key), value[sub_key])
-
     # Base Condition
     else:
         reduced_item[to_string(key)] = to_string(value)
 
 
+
+def getAMPauth(clientID, apiKey):
+    return str(stringToBase64(str(clientID) + ":" + str(apiKey)), 'utf-8')
+
+
 def getEventList(authstring, region):
-    responseTypes = requests.get("https://" + region + "/v1/event_types",
+    responseTypes = requests.get(region + "/v1/event_types",
                                  headers={'Authorization': 'Basic ' + authstring})
     return responseTypes.json()
+
+
+def validateAMPcreds(region, authstring):
+    try:
+        response = requests.get(region + "/v1/version", headers={'Authorization': 'Basic ' + authstring})
+        data = response.json()
+        if (response.status_code == 200):
+            return "ok"
+        else:
+            print("Error Connecting: " + str(response.status_code) + "\n" + str(data["errors"][0]["description"]))
+            return "fail"
+    except:
+        print("Unknown Error: Failed to test if AMP credentials were valid. "
+              "Likely due to no network connection or invalid AMP URL.")
+        return "fail"
 
 
 def getEvents(authstring, region, event_type, offset):
-    responseTypes = requests.get("https://" + region + "/v1/events?event_type[]=" + event_type + "&offset=" + offset,
-                                 headers={'Authorization': 'Basic ' + authstring})
-    return responseTypes.json()
+    if event_type == "all":
+        responseTypes = requests.get(region + "/v1/events?&offset=" + offset,
+                                     headers={'Authorization': 'Basic ' + authstring})
+        return responseTypes.json()
+    else:
+        responseTypes = requests.get(region + "/v1/events?event_type[]=" + event_type + "&offset=" + offset,
+                                     headers={'Authorization': 'Basic ' + authstring})
+        return responseTypes.json()
 
 
 def downloadMISPintel(url, key):
@@ -138,7 +160,10 @@ except IOError:
               + bcolors.ENDC)
         exit()
 
+
+# Load Global Config Values
 config.read('config.ini')
+regionURL = config['AMP_API']['AMP_URL']
 
 rootMenu = menu3.Menu(True)
 rootMenuOptions = ["MISP", "Export CSVs"]
@@ -151,6 +176,7 @@ if rootMenuOptions[rootSelection-1] == "MISP":
     mistMenuOptions = ["Update/Download Intel", "Compare Intel To AMP"]
     mistMenuSelection = mistMenu.menu("Select action", mistMenuOptions, "Your choice:")
 
+# Download intel from MISP
     if mistMenuOptions[mistMenuSelection-1] == "Update/Download Intel":
         if downloadMISPintel(config['MISP_API']['MISP_URL'], config['MISP_API']['MISP_KEY']) == "success":
             data = pd.read_csv('intel/misp.csv')
@@ -162,42 +188,63 @@ if rootMenuOptions[rootSelection-1] == "MISP":
             print("ERROR: Could not download intelligence from MISP")
             exit(1)
 
+# Compare intel from MISP to all events in AMP
+    if mistMenuOptions[mistMenuSelection - 1] == "Compare Intel To AMP":
+        exportMenu = menu3.Menu(False)
+
+        creds = {'3rd Party API Client ID': config['AMP_API']['CLIENT_ID'], 'API Key': config['AMP_API']['API_KEY']}
+        creds = exportMenu.config_menu("Enter AMP API Credentials", creds,
+                                       "Select which field to edit, or Return to proceed: ")
+
+        # Confirm Login Details Are Correct
+        auth = getAMPauth(creds['3rd Party API Client ID'], creds['API Key'])
+
+        if validateAMPcreds(regionURL, auth) == "ok":
+            exportMenu.success("Credentials Accepted")
+        else:
+            print("ERROR: Could not validate AMP credentials.")
+            exit()
+
+        offsetloop = 0
+        data = getEvents(auth, regionURL, "all", str(offsetloop))
+
+        recordPerPage = data["metadata"]["results"]["items_per_page"]
+        totalRecords = data["metadata"]["results"]["total"]
+        cyclesNeeded = totalRecords / recordPerPage
+        currentCycle = 0
+        data2 = []
+
+        while cyclesNeeded >= currentCycle:
+            out = getEvents(auth, regionURL, "all", str(currentCycle * recordPerPage))
+            for i in out["data"]:
+                print(i["event_type"])
+                # TODO: Cycle through amp events and compare against CSV.
+            currentCycle += 1
+
+
+
+
+
+
 # Export CSVs
 # Step 1: Select The AMP Region Where The API Keys Are Located
 
 if rootMenuOptions[rootSelection-1] == "Export CSVs":
     exportMenu = menu3.Menu(False)
-    regionMenuOptions = ["NA", "APJC", "EU"]
-    regionMenuSelection = exportMenu.menu("Select the region the AMP instance is located", regionMenuOptions,
-                                          "Your choice:")
-    exportMenu.success("Setting region to: " + regionMenuOptions[regionMenuSelection-1])
-
-    if regionMenuOptions[regionMenuSelection-1] == "NA":
-        regionURL = "api.amp.cisco.com"
-    if regionMenuOptions[regionMenuSelection - 1] == "APJC":
-        regionURL = "api.apjc.amp.cisco.com"
-    if regionMenuOptions[regionMenuSelection - 1] == "EU":
-        regionURL = "api.eu.amp.cisco.com"
 
     creds = {'3rd Party API Client ID': config['AMP_API']['CLIENT_ID'], 'API Key': config['AMP_API']['API_KEY']}
     creds = exportMenu.config_menu("Enter AMP API Credentials", creds,
                                    "Select which field to edit, or Return to proceed: ")
 
     # Confirm Login Details Are Correct
-    auth = str(stringToBase64(str(creds['3rd Party API Client ID']) + ":" + str(creds['API Key'])), 'utf-8')
-    response = requests.get("https://" + regionURL + "/v1/version", headers={'Authorization': 'Basic ' + auth})
-    data = response.json()
+    auth = getAMPauth(creds['3rd Party API Client ID'], creds['API Key'])
 
-    try:
-        if(response.status_code == 200):
-            exportMenu.success("Credentials Accepted")
-        else:
-            exportMenu.warn("Error Connecting: " + str(response.status_code) + "\n"
-                            + str(data["errors"][0]["description"]))
-            exit(1)
-    except:
-        exportMenu.warn("Error Connecting: Unknown Error")
-        exit(1)
+    if validateAMPcreds(regionURL, auth) == "ok":
+        exportMenu.success("Credentials Accepted")
+    else:
+        print("ERROR: Could not validate AMP credentials.")
+        exit()
+
 
 
     # Get List Of Events To Export
