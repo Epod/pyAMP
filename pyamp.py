@@ -1,3 +1,9 @@
+import sys
+if (sys.version_info < (3, 0)):
+    # Stop running if running python 2
+    print("Scripted for python 3+ only. Halting...")
+    exit(0)
+
 import base64
 import csv
 import configparser
