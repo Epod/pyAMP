@@ -10,6 +10,12 @@ import os
 import configparser
 
 try:
+    import pandas as pd
+except ImportError:
+    print("Missing module: pandas\nConsider running \"setup.py install\"")
+    exit(2)
+
+try:
     import menu3
 except ImportError:
     print("Missing module: menu3\nConsider running \"setup.py install\"")
@@ -67,6 +73,33 @@ def getEvents(authstring, region, event_type, offset):
                                  headers={'Authorization': 'Basic ' + authstring})
     return responseTypes.json()
 
+
+def downloadMISPintel(url, key):
+    try:
+        # Disable SSL Warnings, as some internal MIST installs leverage self signed certs
+        requests.packages.urllib3.disable_warnings()
+
+        intel = requests.get(url + "/events/csv/download/", verify=False, headers={'Authorization': key})
+        if intel.status_code == 200:
+            try:
+                intelcsv = open('intel/misp.csv', 'w', encoding='utf-8')
+            except FileNotFoundError:
+                os.makedirs('intel')
+                intelcsv = open('intel/misp.csv', 'w', encoding='utf-8')
+            intelcsv.write(intel.text)
+            intel.close()
+            return "success"
+        else:
+            print(bcolors.WARNING + "ERROR: Failed to fetch intel. Error code: " + str(intel.status_code)
+                  + bcolors.ENDC)
+
+    except:
+        print(bcolors.WARNING + "ERROR: No HTTP status code returned. Could not download MISP Intel\n"
+                                "Check URL & Connectivity"
+              + bcolors.ENDC)
+        exit()
+
+
 class bcolors:
     HEADER = '\033[95m'
     OKBLUE = '\033[94m'
@@ -108,9 +141,26 @@ except IOError:
 config.read('config.ini')
 
 rootMenu = menu3.Menu(True)
-rootMenuOptions = ["Export CSVs"]
+rootMenuOptions = ["MISP", "Export CSVs"]
 rootSelection = rootMenu.menu("Please make a selection", rootMenuOptions, "Your choice, 'q' to quit:")
 rootMenu.success("You selected: " + rootMenuOptions[rootSelection-1])
+
+# MISP Menu
+if rootMenuOptions[rootSelection-1] == "MISP":
+    mistMenu = menu3.Menu(False)
+    mistMenuOptions = ["Update/Download Intel", "Compare Intel To AMP"]
+    mistMenuSelection = mistMenu.menu("Select action", mistMenuOptions, "Your choice:")
+
+    if mistMenuOptions[mistMenuSelection-1] == "Update/Download Intel":
+        if downloadMISPintel(config['MISP_API']['MISP_URL'], config['MISP_API']['MISP_KEY']) == "success":
+            data = pd.read_csv('intel/misp.csv')
+            print(bcolors.OKBLUE)
+            print(data['type'].value_counts())
+            print("SUCCESS: Intelligence from MISP downloaded:\n" + bcolors.ENDC)
+
+        else:
+            print("ERROR: Could not download intelligence from MISP")
+            exit(1)
 
 # Export CSVs
 # Step 1: Select The AMP Region Where The API Keys Are Located
@@ -129,7 +179,7 @@ if rootMenuOptions[rootSelection-1] == "Export CSVs":
     if regionMenuOptions[regionMenuSelection - 1] == "EU":
         regionURL = "api.eu.amp.cisco.com"
 
-    creds = {'3rd Party API Client ID': config['DEFAULT']['CLIENT_ID'], 'API Key': config['DEFAULT']['API_KEY']}
+    creds = {'3rd Party API Client ID': config['AMP_API']['CLIENT_ID'], 'API Key': config['AMP_API']['API_KEY']}
     creds = exportMenu.config_menu("Enter AMP API Credentials", creds,
                                    "Select which field to edit, or Return to proceed: ")
 
