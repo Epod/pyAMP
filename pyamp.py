@@ -142,11 +142,11 @@ if rootMenuOptions[rootSelection-1] == "Export CSVs":
         if(response.status_code == 200):
             exportMenu.success("Credentials Accepted")
         else:
-            exportMenu.warn("Error Connecting: " + str(response.status_code) + "\n"
+            exportMenu.fail("Error Connecting: " + str(response.status_code) + " - "
                             + str(data["errors"][0]["description"]))
             exit(1)
     except:
-        exportMenu.warn("Error Connecting: Unknown Error")
+        exportMenu.fail("Could not connect to AMP API Halting")
         exit(1)
 
 
@@ -157,7 +157,7 @@ if rootMenuOptions[rootSelection-1] == "Export CSVs":
         for i in data['data']:
             eventTypes.append(i['name'] + " (" + i['description'] + ")")
     except:
-        print("Unknown Error")
+        exportMenu.fail("Unknown Error: Could not parse API event IDs for export.")
         exit(1)
     eventSelection = exportMenu.menu("Select Which Event Type To Export", eventTypes, "Your choice: ")
     eventid = data['data'][int(eventSelection-1)]['id']
@@ -181,7 +181,7 @@ if rootMenuOptions[rootSelection-1] == "Export CSVs":
 
     # Export JSON to CSV
     node = "data"
-    csv_file_path = "output.csv"
+    csv_file_path = "output_"+str(eventid)+".csv"
     raw_data = data
 
     try:
